@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stacja Meteorologiczna</title>
+  <link rel="stylesheet" href="style.css" />
+ 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Monitoring Stacji Meteorologicznej</h1>
+  </header>
+
+ 
+  <section class="esp-data">
+    <div class="card">
+      <h2>Temperatura</h2>
+      <p id="esp-temp"></p>
+    </div>
+    <div class="card">
+      <h2>Ciśnienie</h2>
+      <p id="esp-pressure"></p>
+    </div>
+    <div class="card">
+      <h2>Wilgotność</h2>
+      <p id="esp-humidity"></p>
+    </div>
+  </section>
+
+
+  <section class="esp-graphs">
+    <div class="chart-container">
+      <canvas id="chart-temp-esp"></canvas>
+      <h4 id="temp-max"></h4>
+      <h4 id="temp-min"></h4>
+    </div>
+    <div class="chart-container">
+      <canvas id="chart-pressure-esp"></canvas>
+      <h4 id="pressure-max"></h4>
+      <h4 id="pressure-min"></h4>
+    </div>
+    <div class="chart-container">
+      <canvas id="chart-humidity-esp"></canvas>
+      <h4 id="humidity-max"></h4>
+      <h4 id="humidity-min"></h4>
+    </div>
+  </section>
+
+
+  <section class="api-weather">
+    <h2>Ustawianie lokalizacji</h2>
+    <form id="city-form">
+      <input type="text" id="city-input" placeholder="Wpisz miasto..." required />
+      <button type="submit">Pobierz pogodę</button>
+    </form>
+
+    <ul id="city-suggestions" style="list-style: none; padding: 0; margin: auto; text-align: center;"></ul>
+
+    <div id="weather-result">
+      <div class="card">
+        <p><span id="api-temp"></span></p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    
+  </footer>
+
+  <script>
+    function convertSensorData(jsonData) {
+      const espTimeLabels = [];
+      const espTempData = [];
+      const espPressData = [];
+      const espHumData = [];
+
+      jsonData.forEach(entry => {
+        const date = new Date(entry.timestamp * 1000); // Convert UNIX timestamp to milliseconds
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        espTimeLabels.push(`${hours}:${minutes}`);
+
+        espTempData.push(parseFloat(entry.temperature.toFixed(1)));     // Round to 1 decimal
+        espPressData.push(Math.round(entry.pressure));                  // Round to whole number
+        espHumData.push(Math.round(entry.humidity));                    // Round to whole number
+      });
+
+      return {
+        espTimeLabels,
+        espTempData,
+        espPressData,
+        espHumData
+      };
+    }
+
+    function fetchData() { 
+      fetch(`/api?type=current`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        document.getElementById("esp-temp").innerHTML = `${data["temperature"]} °C`;
+        document.getElementById("esp-pressure").innerHTML = `${data["pressure"]} hPa`;
+        document.getElementById("esp-humidity").innerHTML = `${data["humidity"]} %`;
+      })
+      .catch(error => {
+        console.log("fetch data error");
+      });
+    }
+
+    fetchData();
+    setInterval(fetchData, 1 * 60 * 1000);
+
+    let tempChart, pressureChart, humidityChart;
+
+    function updateGraphs() {
+      rawData = JSON.parse(`[{"timestamp":1747499482,"temperature":23.39,"pressure": 971.56,"humidity": 33.8701},{"timestamp":1747499382,"temperature":23.39,"pressure": 971.49,"humidity": 33.7988},{"timestamp":1747499371,"temperature":23.41,"pressure": 971.48,"humidity": 33.7695},{"timestamp":1747499361,"temperature":23.38,"pressure": 971.48,"humidity": 33.8076},{"timestamp":1747499351,"temperature":23.39,"pressure": 971.47,"humidity": 33.8389}]`);
+
+      fetch(`/api?type=last&limit=1440`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        rawData = data;
+        const { espTimeLabels, espTempData, espPressData, espHumData } = convertSensorData(rawData);
+
+        let createOrUpdateChart = (chartInstance, ctxId, label, data, yLabel) => {
+          if (chartInstance) {
+            chartInstance.data.labels = espTimeLabels;
+            chartInstance.data.datasets[0].data = data;
+            chartInstance.update();
+            return chartInstance;
+          } else {
+            const ctx = document.getElementById(ctxId).getContext('2d');
+            return new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels: espTimeLabels,
+                datasets: [{
+                  label: label,
+                  data: data,
+                  fill: false,
+                  tension: 0.4
+                }]
+              },
+              options: {
+                scales: {
+                  y: {
+                    title: { display: true, text: yLabel }
+                  },
+                  x: {
+                    reverse: true,
+                    title: { display: true, text: 'Czas' }
+                  }
+                }
+              }
+            });
+          }
+        };
+
+        tempChart = createOrUpdateChart(tempChart, 'chart-temp-esp', 'Temperatura ESP', espTempData, '°C');
+        pressureChart = createOrUpdateChart(pressureChart, 'chart-pressure-esp', 'Ciśnienie ESP', espPressData, 'hPa');
+        humidityChart = createOrUpdateChart(humidityChart, 'chart-humidity-esp', 'Wilgotność ESP', espHumData, '%');
+
+        if(Array.isArray(espTempData) && espTempData.length != 0) {
+          document.getElementById('temp-max').innerHTML = `Max: ${Math.max(...espTempData)} °C`;
+          document.getElementById('temp-min').innerHTML = `Min: ${Math.min(...espTempData)} °C`;
+        }
+        if(Array.isArray(espPressData) && espPressData.length != 0) {
+          document.getElementById('pressure-max').innerHTML = `Max: ${Math.max(...espPressData)} hPa`;
+          document.getElementById('pressure-min').innerHTML = `Min: ${Math.min(...espPressData)} hPa`;
+        }
+        if(Array.isArray(espHumData) && espHumData.length != 0) {
+          document.getElementById('humidity-max').innerHTML = `Max: ${Math.max(...espHumData)} %`;
+          document.getElementById('humidity-min').innerHTML = `Min: ${Math.min(...espHumData)} %`;
+        }
+      })
+      .catch(error => {
+        console.log("update graphs error");
+      });
+    }
+    
+    updateGraphs();
+    setInterval(updateGraphs, 5 * 60 * 1000);
+
+    document.getElementById('city-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const cityInput = document.getElementById('city-input');
+    const city = cityInput.value.trim();
+    if (!city) return;
+
+    const suggestionsList = document.getElementById('city-suggestions');
+    suggestionsList.innerHTML = ''; // Clear previous suggestions
+
+    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=5`);
+    const geoData = await geoRes.json();
+
+    if (!geoData.results || !geoData.results.length) {
+      document.getElementById('api-temp').textContent     = 'Nie znaleziono miasta.';
+    } else {
+      geoData.results.forEach(place => {
+        const li = document.createElement('li');
+        li.textContent = `${place.name}, ${place.country}`;
+        li.style.cursor = 'pointer';
+        li.style.padding = '4px';
+        li.style.borderBottom = '1px solid #ccc';
+        
+        li.addEventListener('click', async () => {
+          fetch(`/api?type=location&lat=${place.latitude}&lon=${place.longitude}`)
+          .then(response => {
+            if (!response.ok) {
+              document.getElementById('api-temp').textContent     = `Nie udało się ustawić lokalizacji.`;
+            }
+            return response.json();
+          })
+          .then(data => {
+            document.getElementById('api-temp').textContent     = `Pomyślnie ustawiono lokalizacje na ${place.name}, ${place.country}.`;
+          })
+          .catch(error => {
+            document.getElementById('api-temp').textContent     = `Nie udało się ustawić lokalizacji.`;
+          });
+        });
+
+        suggestionsList.appendChild(li);
+      });
+    }
+  });
+  </script>
+</body>
+</html>
