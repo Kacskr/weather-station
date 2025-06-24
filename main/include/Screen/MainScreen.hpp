@@ -11,6 +11,7 @@ extern "C" {
 #include "TimeWidget.hpp"
 #include "WeatherWidget.hpp"
 #include "HomeWidget.hpp"
+#include "WeatherDashboard.hpp"
 
 namespace ws {
     class MainScreen : public Screen {
@@ -27,8 +28,10 @@ namespace ws {
         WeatherPanel m_panels[3];
         WeatherWidget m_weatherWidget;
         HomeWidget m_homeWidget;
+        WeatherDashboard m_dashboard;
 
         ks_weather_forecast_t m_forecast{};
+        ks_extended_weather_forecast_t m_extendedForecast{};
 
         lv_obj_t* m_settingsMain{};
         lv_obj_t* m_settingsIPLabel{};

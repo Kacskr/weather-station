@@ -71,6 +71,10 @@ namespace ws {
 
         lv_obj_add_flag(m_settingsMain, LV_OBJ_FLAG_HIDDEN);
 
+        m_dashboard.create(get());
+        m_dashboard.set_visibility(0);
+        m_dashboard.set_size(240, 320);
+
         refresh();
     }
 
@@ -78,6 +82,15 @@ namespace ws {
         m_timeWidget.update(get_data().timeinfo);
         m_weatherWidget.update(ks_weather_get_current_weather());
         m_homeWidget.update(get_data().temperature, get_data().humidity, get_data().pressure);
+
+        if(m_extendedForecast.error == 0){
+            for(int i = 0; i < 3; i++){
+                if(m_panels[i].was_clicked()){
+                    m_dashboard.update(m_extendedForecast.weatherData[i]);
+                    m_dashboard.set_visibility(1);
+                }
+            }
+        }
 
         if(ks_wifi_is_connected()){
             if(m_lastWifi == 0){
@@ -101,6 +114,7 @@ namespace ws {
         if(ks_wifi_is_connected()){
             ks_weather_update_weather();
             m_forecast = ks_weather_get_forecast();
+            m_extendedForecast = ks_weather_get_extended_forecast();
             for(int i = 0; i < 3; i++){
                 m_panels[i].set_day_label(s_daysAb[m_forecast.weatherData[i].wday]);
                 m_panels[i].set_temperature_label(m_forecast.weatherData[i].minTemperature / 10, m_forecast.weatherData[i].maxTemperature / 10);

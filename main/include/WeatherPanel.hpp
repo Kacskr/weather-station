@@ -34,6 +34,11 @@ namespace ws {
             lv_label_set_text(m_icon, icon);
             realign();
         }
+        auto was_clicked() -> bool {
+            const bool b = m_clicked;
+            m_clicked = 0;
+            return b;
+        }
 
     private:
         auto realign() -> void;
@@ -46,5 +51,9 @@ namespace ws {
 
         int m_x{};
         int m_y{};
+
+        bool m_clicked{};
+
+        friend void click_button_callback(lv_event_t* e);
     };
 }

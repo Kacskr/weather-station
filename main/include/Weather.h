@@ -278,13 +278,27 @@ typedef struct{
 } weather_data_t;
 
 typedef struct{
+    uint8_t month;
+    uint8_t day;
+    int temperature[24];
+    int precipitationProobability[24];
+    int weatherCode[24];
+} extended_weather_data_t;
+
+typedef struct{
     bool error;
     weather_data_t weatherData[4];
 } ks_weather_forecast_t;
 
+typedef struct{
+    bool error;
+    extended_weather_data_t weatherData[4];
+} ks_extended_weather_forecast_t;
+
 extern ks_weather_t ks_weather_update_weather();
 extern ks_weather_t ks_weather_get_current_weather();
 extern ks_weather_forecast_t ks_weather_get_forecast();
+extern ks_extended_weather_forecast_t ks_weather_get_extended_forecast();
 extern char* ks_symbols_get_weather_icon_day(const ks_weather_t* weather);
 extern char* ks_symbols_get_weather_icon_night(const ks_weather_t* weather);
 extern char* ks_symbols_get_weather_icon_neutral(const uint8_t code);

@@ -9,10 +9,13 @@
 
 #define WINDY 300
 
+#define MIN(a, b) (a > b ? a : b)
+
 const char* ks_days[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
 static esp_http_client_handle_t s_httpClient = 0;
 static esp_http_client_handle_t s_httpForecastClient = 0;
+static esp_http_client_handle_t s_httpExtendedClient = 0;
 static ks_weather_t s_currentWeather;
 
 ks_weather_t ks_weather_update_weather(){
@@ -292,6 +295,142 @@ ks_weather_forecast_t ks_weather_get_forecast(){
             }
         }
         retForecast.weatherData[i].wday = (i + timeinfo.tm_wday) % 7;
+    }
+
+    cJSON_Delete(root);
+    retForecast.error = 0;
+    free(buffer);
+    return retForecast;
+}
+ks_extended_weather_forecast_t ks_weather_get_extended_forecast() {
+    ks_extended_weather_forecast_t retForecast;
+    memset(retForecast.weatherData, 0, sizeof(retForecast.weatherData));
+    retForecast.error = 1;
+
+    ks_value_t x = ks_nvs_load_int32("lon");
+    ks_value_t y = ks_nvs_load_int32("lat");
+
+    char url[512] = {};
+    float lon = 0.0f, lat = 0.0f;
+
+    if(x.error == 0 && y.error == 0){
+        memcpy(&lon, &x.value, sizeof(float));
+        memcpy(&lat, &y.value, sizeof(float));
+    }
+
+    snprintf(url, sizeof(url), "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=3&timezone=Europe%%2FBerlin", lat, lon);
+
+    if(s_httpExtendedClient == 0){
+        esp_http_client_config_t clientConfig = {
+            .url = url,
+            .method = HTTP_METHOD_GET,
+            .keep_alive_enable = 1,
+            .buffer_size = 0,
+            .timeout_ms = 5000,
+        };
+        s_httpExtendedClient = esp_http_client_init(&clientConfig);
+    } else {
+        esp_http_client_set_url(s_httpExtendedClient, url);
+    }
+
+    if(esp_http_client_open(s_httpExtendedClient, 0) != ESP_OK){
+        printf("Forecast: open error\n");
+        return retForecast;
+    }
+    if(esp_http_client_fetch_headers(s_httpExtendedClient) < 0){
+        printf("Forecast: fetch error\n");
+        esp_http_client_close(s_httpExtendedClient);
+        return retForecast;
+    }
+
+    char* buffer = calloc(4096 + 1, 1);
+    const int len = esp_http_client_read(s_httpExtendedClient, buffer, 4096);
+    if(len == -1){
+        free(buffer);
+        printf("Forecast: read error\n");
+        esp_http_client_close(s_httpExtendedClient);
+        return retForecast;
+    }
+    buffer[len] = '\0';
+    if(esp_http_client_close(s_httpExtendedClient) != ESP_OK){
+        free(buffer);
+        printf("Forecast: close error\n");
+        return retForecast;
+    }
+
+    cJSON* root = cJSON_Parse(buffer);
+    if(root == NULL){
+        free(buffer);
+        printf("Forecast: error parsing JSON\n");
+        return retForecast;
+    }
+
+    cJSON* hourly = cJSON_GetObjectItem(root, "hourly");
+    if(hourly == NULL){
+        free(buffer);
+        printf("Forecast: hourly error");
+        return retForecast;
+    }
+
+    cJSON* times = cJSON_GetObjectItem(hourly, "time");
+    if(times == NULL || !cJSON_IsArray(times) || cJSON_GetArraySize(times) == 0){
+        free(buffer);
+        printf("Forecast: times error");
+        return retForecast;
+    }
+
+    cJSON* temperatures = cJSON_GetObjectItem(hourly, "temperature_2m");
+    if(temperatures == NULL || !cJSON_IsArray(temperatures) || cJSON_GetArraySize(temperatures) == 0){
+        free(buffer);
+        printf("Forecast: temperatures error");
+        return retForecast;
+    }
+
+    cJSON* probabilities = cJSON_GetObjectItem(hourly, "precipitation_probability");
+    if(probabilities == NULL || !cJSON_IsArray(probabilities) || cJSON_GetArraySize(probabilities) == 0){
+        free(buffer);
+        printf("Forecast: probabilities error");
+        return retForecast;
+    }
+
+    cJSON* wCodes = cJSON_GetObjectItem(hourly, "weather_code");
+    if(wCodes == NULL || !cJSON_IsArray(wCodes) || cJSON_GetArraySize(wCodes) == 0){
+        free(buffer);
+        printf("Forecast: wCodes error");
+        return retForecast;
+    }
+
+    const int size = MIN(
+        cJSON_GetArraySize(times),
+        MIN(cJSON_GetArraySize(temperatures),
+        MIN(cJSON_GetArraySize(probabilities),
+        cJSON_GetArraySize(wCodes))
+    ));
+
+    for (int i = 0; i < size; i++) {
+        cJSON* wc = cJSON_GetArrayItem(wCodes, i);
+        if(cJSON_IsNumber(wc)){
+            retForecast.weatherData[i / 24].weatherCode[i % 24] = wc->valueint;
+        }
+
+        cJSON* t = cJSON_GetArrayItem(temperatures, i);
+        if(cJSON_IsNumber(t)){
+            retForecast.weatherData[i / 24].temperature[i % 24] = (int)(t->valuedouble * 10.0);
+        }
+
+        cJSON* p = cJSON_GetArrayItem(probabilities, i);
+        if(cJSON_IsNumber(t)){
+            retForecast.weatherData[i / 24].precipitationProobability[i % 24] = p->valueint;
+        }
+
+        cJSON* timeString = cJSON_GetArrayItem(times, i);
+        if(cJSON_IsString(timeString)){
+            int month, day;
+            if(sscanf(timeString->valuestring, "%*d-%d-%dT%*d:%*d", &month, &day) == 2){
+                retForecast.weatherData[i / 24].month = month;
+                retForecast.weatherData[i / 24].day = day;
+            }
+        }
     }
 
     cJSON_Delete(root);
