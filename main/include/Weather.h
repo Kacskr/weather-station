@@ -281,7 +281,7 @@ typedef struct{
     uint8_t month;
     uint8_t day;
     int temperature[24];
-    int precipitationProobability[24];
+    int precipitationProbability[24];
     int weatherCode[24];
 } extended_weather_data_t;
 

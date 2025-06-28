@@ -13,6 +13,9 @@ An ESP32-S3 device that displays weather forecast using the [Open-Meteo API](htt
 When using the device for the first time, it will start in Access Point mode, displaying the device's IP and sensor data. Connect to the device via Wi-Fi, then open the website at the IP address shown on the display. Once successfully connected to the Wi-Fi network, the device will switch to Station mode and download weather data.
 ![Showcase-ap](showcase/ap-mode.jpg "Showcase-ap")
 
+To view the hourly temperature and precipitation probability for a specific day, simply tap the day's widget to display the table.
+![Showcase-table](showcase/table.jpg "Showcase-table")
+
 To access the web interface later, navigate to the IP address shown on the settings screen. To open the settings screen, press and hold the display for 5 seconds.
 ![Showcase-wifi](showcase/wifi.jpg "Showcase-wif")
 You can also disconnect the device from Wi-Fi by pressing the disconnect button.

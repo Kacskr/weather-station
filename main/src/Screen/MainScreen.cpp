@@ -85,8 +85,8 @@ namespace ws {
 
         if(m_extendedForecast.error == 0){
             for(int i = 0; i < 3; i++){
-                if(m_panels[i].was_clicked()){
-                    m_dashboard.update(m_extendedForecast.weatherData[i]);
+                if(m_panels[i].was_clicked() && lv_obj_has_flag(m_settingsMain, LV_OBJ_FLAG_HIDDEN)){
+                    m_dashboard.update(m_extendedForecast.weatherData[i], m_forecast.weatherData[i].wday);
                     m_dashboard.set_visibility(1);
                 }
             }

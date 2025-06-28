@@ -14,7 +14,7 @@ namespace ws {
 
         auto create(lv_obj_t* src) -> void;
 
-        auto update(extended_weather_data_t& weatherData) -> void;
+        auto update(extended_weather_data_t& weatherData, uint8_t day) -> void;
 
         auto set_position(const int x, const int y) -> void {
             m_x = x;
@@ -46,5 +46,8 @@ namespace ws {
         lv_obj_t* m_main{};
         lv_obj_t* m_button{};
         lv_obj_t* m_buttonLabel{};
+        lv_obj_t* m_label{};
+
+        lv_obj_t * m_table;
     };
 }

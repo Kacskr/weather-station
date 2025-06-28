@@ -420,7 +420,7 @@ ks_extended_weather_forecast_t ks_weather_get_extended_forecast() {
 
         cJSON* p = cJSON_GetArrayItem(probabilities, i);
         if(cJSON_IsNumber(t)){
-            retForecast.weatherData[i / 24].precipitationProobability[i % 24] = p->valueint;
+            retForecast.weatherData[i / 24].precipitationProbability[i % 24] = p->valueint;
         }
 
         cJSON* timeString = cJSON_GetArrayItem(times, i);
